@@ -2865,7 +2865,7 @@ template <class _CharT, class _Traits, class _Allocator>
 inline _LIBCPP_CONSTEXPR_SINCE_CXX20 void basic_string<_CharT, _Traits, _Allocator>::__move_assign(
     basic_string& __str, false_type) noexcept(__alloc_traits::is_always_equal::value) {
   if (__alloc_ != __str.__alloc_)
-    assign(__str);
+    assign(__str.data(), __str.size()); // Not assign(__str): that is copy assignment, which may propagate the allocator.
   else
     __move_assign(__str, true_type());
 }
