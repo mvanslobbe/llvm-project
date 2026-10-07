@@ -275,12 +275,8 @@ public:
       return *this;
 
     if _LIBCPP_CONSTEXPR (__alloc_traits::propagate_on_container_copy_assignment::value) {
-      if (this->__layout_.__alloc() != __other.__layout_.__alloc()) {
-        clear();
-        __annotate_delete();
-        __alloc_traits::deallocate(this->__layout_.__alloc(), this->__layout_.__begin_ptr(), capacity());
-        __layout_.__reset_without_allocator();
-      }
+      if (this->__layout_.__alloc() != __other.__layout_.__alloc())
+        __vdeallocate(); // Does nothing if no memory was allocated.
       this->__layout_.__alloc() = __other.__layout_.__alloc();
     }
 
