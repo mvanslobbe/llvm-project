@@ -94,6 +94,13 @@ constexpr void for_all_iterators_and_allocators(Func f) {
       f.template operator()<Iter, Iter, safe_allocator<T>>();
     }
   });
+  // An iterator that models random_access_iterator but whose iterator_category is only input_iterator_tag, like the
+  // iterators of many views (e.g. transform_view). The implementation must not use Cpp17 iterator algorithms such as
+  // std::prev on it.
+  f.template operator()<cpp20_random_access_iterator<PtrT>, cpp20_random_access_iterator<PtrT>, std::allocator<T>>();
+  f.template operator()<cpp20_random_access_iterator<PtrT>,
+                        sentinel_wrapper<cpp20_random_access_iterator<PtrT>>,
+                        std::allocator<T>>();
   // This is added because otherwise there would be no input-only sized range, which has fewer guarantees than a
   // forward and sized range. We don't want to put it in the for_each above to avoid a combinatorial explosion.
   f.template operator()<cpp20_input_iterator<PtrT>, sized_sentinel<cpp20_input_iterator<PtrT>>, std::allocator<T>>();
