@@ -60,7 +60,7 @@ __uninitialized_copy(
     _InputIterator __ifirst, _Sentinel1 __ilast, _ForwardIterator __ofirst, _EndPredicate __stop_copying) {
   _ForwardIterator __idx = __ofirst;
   auto __guard           = std::__make_exception_guard([&] { std::__destroy(__ofirst, __idx); });
-  for (; __ifirst != __ilast && !__stop_copying(__idx); ++__ifirst, (void)++__idx)
+  for (; __ifirst != __ilast && !__stop_copying(__idx); ++__idx, (void)++__ifirst)
     ::new (static_cast<void*>(std::addressof(*__idx))) _ValueType(*__ifirst);
   __guard.__complete();
 
@@ -83,7 +83,7 @@ inline _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX26 __in_out_result<_Inpu
 __uninitialized_copy_n(_InputIterator __ifirst, _Size __n, _ForwardIterator __ofirst, _EndPredicate __stop_copying) {
   _ForwardIterator __idx = __ofirst;
   auto __guard           = std::__make_exception_guard([&] { std::__destroy(__ofirst, __idx); });
-  for (; __n > 0 && !__stop_copying(__idx); ++__ifirst, (void)++__idx, (void)--__n)
+  for (; __n > 0 && !__stop_copying(__idx); ++__idx, (void)++__ifirst, (void)--__n)
     ::new (static_cast<void*>(std::addressof(*__idx))) _ValueType(*__ifirst);
   __guard.__complete();
 
@@ -366,8 +366,8 @@ __uninitialized_allocator_copy_n_impl(_Alloc& __alloc, _Iter1 __first1, _Size __
       std::__make_exception_guard(_AllocatorDestroyRangeReverse<_Alloc, _Iter2>(__alloc, __destruct_first, __first2));
   for (_Size __i = 0; __i != __count; ++__i) {
     allocator_traits<_Alloc>::construct(__alloc, std::__to_address(__first2), *__first1);
+    ++__first2; // Before ++__first1, which may throw, so that the guard destroys the element constructed above.
     ++__first1;
-    ++__first2;
   }
   __guard.__complete();
   return __first2;
