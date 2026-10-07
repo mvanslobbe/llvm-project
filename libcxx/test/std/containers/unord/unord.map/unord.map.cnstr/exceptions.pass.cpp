@@ -17,6 +17,10 @@
 // Also check the copy-assignment-into-empty path, which shares the same node-copying helper.
 // There the assigned-to container stays alive, so after a throw it must be left in a valid
 // (usable, leak-free) state with no dangling bucket pointers.
+//
+// Finally check copy assignment into a non-empty map, which reuses the destination's nodes and
+// assigns the source's values into them. If such an assignment throws, the destination must
+// still be consistent: every element it contains can be found, and no key appears twice.
 
 #include <cassert>
 #include <cstddef>
@@ -62,7 +66,69 @@ struct CountedThrowingAllocator {
   }
 };
 
+// A value type whose copy assignment throws once a shared countdown reaches zero.
+struct ThrowingAssign {
+  static int countdown;
+  int value;
+
+  ThrowingAssign(int v) : value(v) {}
+  ThrowingAssign(const ThrowingAssign&) = default;
+  ThrowingAssign& operator=(const ThrowingAssign& other) {
+    if (countdown == 0)
+      throw 42;
+    if (countdown > 0)
+      --countdown;
+    value = other.value;
+    return *this;
+  }
+};
+
+int ThrowingAssign::countdown = -1;
+
+void test_copy_assign_reusing_nodes() {
+  typedef std::unordered_map<int, ThrowingAssign> Map;
+
+  Map src;
+  for (int i = 0; i < 16; ++i)
+    src.insert(std::make_pair(i, ThrowingAssign(i)));
+
+  for (int dst_size = 1; dst_size <= 24; dst_size += 7) {
+    // Only the reused nodes are assigned into, at most min(dst_size, src.size()) of them.
+    for (int fail_at = 0; fail_at < dst_size && fail_at < 16; ++fail_at) {
+      const int outstanding_before = globalMemCounter.outstanding_new;
+      {
+        Map dst;
+        for (int i = 0; i < dst_size; ++i)
+          dst.insert(std::make_pair(100 + i, ThrowingAssign(i)));
+
+        ThrowingAssign::countdown = fail_at;
+        try {
+          dst = src;
+          assert(false);
+        } catch (int) {
+        }
+        ThrowingAssign::countdown = -1;
+
+        // Every element that can be reached by iteration must also be found by lookup.
+        std::size_t n = 0;
+        for (Map::iterator it = dst.begin(); it != dst.end(); ++it, ++n)
+          assert(dst.find(it->first) == it);
+        assert(n == dst.size());
+
+        // Inserting keys again must not create duplicates.
+        for (int i = 0; i < 16; ++i)
+          dst.insert(std::make_pair(i, ThrowingAssign(i)));
+        for (int i = 0; i < 16; ++i)
+          assert(dst.count(i) == 1);
+      }
+      assert(globalMemCounter.outstanding_new == outstanding_before);
+    }
+  }
+}
+
 int main(int, char**) {
+  test_copy_assign_reusing_nodes();
+
   typedef CountedThrowingAllocator<std::pair<const int, int> > Alloc;
   typedef std::unordered_map<int, int, std::hash<int>, std::equal_to<int>, Alloc> Map;
 

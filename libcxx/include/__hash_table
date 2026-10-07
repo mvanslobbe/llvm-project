@@ -1235,6 +1235,15 @@ __hash_table<_Tp, _Hash, _Equal, _Alloc>::operator=(const __hash_table& __other)
     return *this;
   }
 
+  // If copying a value throws, the bucket list no longer matches the node list. Release all nodes and leave the table
+  // empty, so that it is in a valid state.
+  auto __guard = std::__make_exception_guard([&] {
+    __deallocate_node_list(__first_node_.__next_);
+    __first_node_.__next_ = nullptr;
+    std::fill_n(__bucket_list_.get(), bucket_count(), nullptr);
+    __size_ = 0;
+  });
+
   __next_pointer __other_iter = __other.__first_node_.__next_;
   __next_pointer __own_iter   = __first_node_.__ptr();
   {
@@ -1274,6 +1283,7 @@ __hash_table<_Tp, _Hash, _Equal, _Alloc>::operator=(const __hash_table& __other)
   }
 
   __size_ = __other.size();
+  __guard.__complete();
 
   return *this;
 }
