@@ -2396,7 +2396,8 @@ private:
     if (__alloc_ == __str.__alloc_)
       __alloc_ = __str.__alloc_;
     else {
-      if (!__str.__is_long()) {
+      // A long string can hold few enough characters to fit into the small buffer, e.g. after erase().
+      if (!__str.__is_long() || __fits_in_sso(__str.size())) {
         __reset_internal_buffer();
         __alloc_ = __str.__alloc_;
       } else {

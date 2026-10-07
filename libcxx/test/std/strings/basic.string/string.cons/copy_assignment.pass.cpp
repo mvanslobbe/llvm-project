@@ -13,10 +13,12 @@
 
 #include <string>
 #include <cassert>
+#include <cstddef>
 
 #include "test_macros.h"
 #include "min_allocator.h"
 #include "asan_testing.h"
+#include "allocators.h"
 
 template <class S>
 TEST_CONSTEXPR_CXX20 void test(S s1, const S& s2) {
@@ -46,11 +48,32 @@ TEST_CONSTEXPR_CXX20 void test_string() {
        S("abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz"));
 }
 
+#if TEST_STD_VER >= 11
+// The allocator propagates on copy assignment and the allocators compare unequal, so the destination has to drop its
+// buffer and allocate with the source's allocator. The source is in the long representation but holds few enough
+// characters to fit into the small buffer.
+TEST_CONSTEXPR_CXX20 void test_pocca_unequal_long_source_with_short_size() {
+  using A = POCCAAllocator<char>;
+  using S = std::basic_string<char, std::char_traits<char>, A>;
+  for (std::size_t n = 0; n < 40; ++n) {
+    S src(100, 'x', A(1, nullptr));
+    src.resize(n);
+    S dst("hello", A(2, nullptr));
+    dst = src;
+    LIBCPP_ASSERT(dst.__invariants());
+    assert(dst == src);
+    assert(dst.get_allocator() == A(1, nullptr));
+    LIBCPP_ASSERT(is_string_asan_correct(dst));
+  }
+}
+#endif
+
 TEST_CONSTEXPR_CXX20 bool test() {
   test_string<std::string>();
 #if TEST_STD_VER >= 11
   test_string<std::basic_string<char, std::char_traits<char>, min_allocator<char>>>();
   test_string<std::basic_string<char, std::char_traits<char>, safe_allocator<char>>>();
+  test_pocca_unequal_long_source_with_short_size();
 #endif
 
 #if TEST_STD_VER >= 11
