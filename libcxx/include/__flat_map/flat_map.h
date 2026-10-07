@@ -392,7 +392,14 @@ public:
     return *this;
   }
 
-  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX26 flat_map& operator=(const flat_map&) = default;
+  _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX26 flat_map& operator=(const flat_map& __other) {
+    // If an exception is thrown, we have no choice but to clear *this to preserve invariants
+    auto __on_exception = std::__make_exception_guard([&]() noexcept { clear() /* noexcept */; });
+    __containers_       = __other.__containers_;
+    __compare_          = __other.__compare_;
+    __on_exception.__complete();
+    return *this;
+  }
 
   _LIBCPP_HIDE_FROM_ABI _LIBCPP_CONSTEXPR_SINCE_CXX26 flat_map& operator=(flat_map&& __other) noexcept(
       is_nothrow_move_assignable_v<_KeyContainer> && is_nothrow_move_assignable_v<_MappedContainer> &&
