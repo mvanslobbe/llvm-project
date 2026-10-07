@@ -2737,19 +2737,13 @@ basic_string<_CharT, _Traits, _Allocator>::__assign_no_alias(const value_type* _
     return [] [[__gnu__::__noinline__]] (basic_string& __this, const value_type* __ls, size_type __ln) static {
       std::__assume(__this.__is_long() == !__is_short);
       std::__assume(!__alloc_traits::is_always_equal::value || __ln <= __this.max_size());
-      __this.__annotate_delete();
-      auto __annotate_guard = std::__make_scope_guard(__annotate_new_size(__this));
-      if _LIBCPP_CONSTEXPR (!__is_short)
-        __alloc_traits::deallocate(__this.__alloc_, __this.__get_long_pointer(), __this.__get_long_cap());
-      auto __guard   = std::__make_exception_guard([&] {
-        if _LIBCPP_CONSTEXPR (!__is_short)
-          __this.__rep_ = __rep();
-      });
       auto __new_cap = __this.__get_amortized_growth_capacity(__ln);
       std::__assume(__new_cap <= __this.max_size());
-      __this.__init_internal_buffer(__new_cap);
-      __this.__set_long_size(__ln);
-      __guard.__complete();
+      // Allocate before releasing the old buffer: if the allocation throws, the string must be unchanged
+      // ([string.require]).
+      auto __new_buffer     = __allocate_long_buffer(__this.__alloc_, __ln, __new_cap);
+      auto __annotate_guard = std::__make_scope_guard(__annotate_new_size(__this));
+      __this.__reset_internal_buffer(__new_buffer);
       traits_type::copy(std::__to_address(__this.__get_long_pointer()), __ls, __ln + 1);
     }(*this, __s, __n);
   }
